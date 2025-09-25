@@ -32,7 +32,7 @@ int main(){
         );
         switch(c){
             case 1 : 
-            // ทำความเข้าใจก่อน
+        
             while(1) {
                  printf("\n\n\n-----seach information-----\n\n\nPlease type to search (or type 'back' to return to menu):");
                  // fgets ทำงานคล้ายๆกับ scanf เป็นฟังก์ชันใช้อ่านสตริงจากสตรีมอินพุต
@@ -69,16 +69,30 @@ int main(){
             break;
 
             case 2 : 
-                 printf("\n-----add information-----\n");
+                 printf("\n-----add information-----\n\n\n");
                 //โค้ดรับค่าข้อมูลที่เพิ่ม
             break;
             case 3 : 
-                 printf("\n-----edit information-----\n");
+                 printf("\n-----edit information-----\n\n\n");
                 //โค้ดแก้ไขข้อมูล
             break;
             case 4 : 
-                 printf("\n\n\n-------exit program-------\n\n\nthank you\n");
-                 
+            while (1)
+            {
+                  printf("\n\n\n-------exit program-------\n\n\ndo you want to close the program? (yes/no)\n");
+                 char exit_choice[MAX_LINE_LENGTH]; //เก็บคำตอบของผู้ใช้
+                 fgets(exit_choice, sizeof(exit_choice), stdin);
+                 exit_choice[strcspn(exit_choice, "\n")] = 0;
+
+                 if (strcmp(exit_choice, "yes") == 0) {
+                     printf("\n\nExiting program...\n\n\nthanks for using the program\n");
+                     break;
+                 } else {
+                     printf("\n\nReturning to menu...\n\n\n");
+                 } 
+            }
+            
+              
             break;
             default : 
                  printf(" \n\n\n\ninvalid choice\n\n please select again\n\n");
