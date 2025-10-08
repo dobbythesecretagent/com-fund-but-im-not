@@ -2,26 +2,27 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <ctype.h>
 
 #define main_file "traveling.csv"
+#define copy_file "traveling_copy.csv"
 #define deleted_file "deleted.csv"
-#define backup_file "backup.csv"
 #define max_line 512
-#define max_rec 200
+#define max_note 200
 
 typedef struct {
-    int bookingid;
-    char name[100];
-    char city[100];
-    char duration[50];
-    int day;
-    int month;
-    int year;
-} record;
+    int BookingId;
+    char Name[100];
+    char City[100];
+    char Duration[50];
+    int Day;
+    int Month;
+    int Year;
+} note;
 
-record records[max_rec];
-int record_count = 0;
-int lastbookingid = 0;
+note records[max_note];
+int note_count = 0;
+int LastBookingId = 0;
 
 char *months[] = {"","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
 
@@ -40,94 +41,103 @@ int valid_date(int day, int month, int year) {
     return 1;
 }
 
+int valid_number(const char *s) {
+    if (strlen(s) == 0) return 0;
+    for (int i = 0; s[i]; i++) {
+        if (!isdigit(s[i])) return 0;
+    }
+    return 1;
+}
+
 // ===== file management =====
-void backup_csv() {
+void create_copy_csv() {
     FILE *src = fopen(main_file, "r");
-    FILE *dst = fopen(backup_file, "w");
-    if (!src || !dst) return;
-    char ch;
-    while ((ch = fgetc(src)) != EOF) fputc(ch, dst);
-    fclose(src);
-    fclose(dst);
-}
-
-void restore_csv() {
-    FILE *src = fopen(backup_file, "r");
-    FILE *dst = fopen(main_file, "w");
-    if (!src || !dst) return;
-    char ch;
-    while ((ch = fgetc(src)) != EOF) fputc(ch, dst);
-    fclose(src);
-    fclose(dst);
-    remove(backup_file);
-}
-
-// ===== core I/O =====
-void load_csv() {
-    FILE *file = fopen(main_file, "r");
-    if (!file) {
-        printf("no existing data file found (%s). starting fresh.\n", main_file);
+    FILE *dst = fopen(copy_file, "w");
+    if (!src) {
+        // ถ้าไม่มี traveling.csv ให้สร้างไฟล์เปล่า
+        dst = fopen(main_file, "w");
+        fclose(dst);
+        src = fopen(main_file, "r");
+        dst = fopen(copy_file, "w");
+    }
+    if (!src || !dst) {
+        printf("error creating copy file.\n");
+        if (src) fclose(src);
+        if (dst) fclose(dst);
         return;
     }
-    record_count = 0;
+    char ch;
+    while ((ch = fgetc(src)) != EOF)
+        fputc(ch, dst);
+    fclose(src);
+    fclose(dst);
+}
+
+void load_csv() {
+    FILE *file = fopen(copy_file, "r");
+    if (!file) {
+        printf("no data found. starting fresh.\n");
+        return;
+    }
+    note_count = 0;
     char line[max_line];
     while (fgets(line, sizeof(line), file)) {
-        record r;
+        note r;
         if (sscanf(line, "%d,%99[^,],%99[^,],%49[^,],%d-%d-%d",
-                   &r.bookingid, r.name, r.city, r.duration,
-                   &r.day, &r.month, &r.year) == 7) {
-            records[record_count++] = r;
-            if (r.bookingid > lastbookingid) lastbookingid = r.bookingid;
+                   &r.BookingId, r.Name, r.City, r.Duration,
+                   &r.Day, &r.Month, &r.Year) == 7) {
+            records[note_count++] = r;
+            if (r.BookingId > LastBookingId) LastBookingId = r.BookingId;
         }
     }
     fclose(file);
 }
 
 void save_csv() {
-    FILE *file = fopen(main_file, "w");
+    FILE *file = fopen(copy_file, "w");
     if (!file) {
-        printf("cannot write to file\n");
+        printf("can't write to file\n");
         return;
     }
-    for (int i = 0; i < record_count; i++) {
+    for (int i = 0; i < note_count; i++) {
         fprintf(file, "%d,%s,%s,%s,%02d-%02d-%04d\n",
-                records[i].bookingid, records[i].name,
-                records[i].city, records[i].duration,
-                records[i].day, records[i].month, records[i].year);
+                records[i].BookingId, records[i].Name,
+                records[i].City, records[i].Duration,
+                records[i].Day, records[i].Month, records[i].Year);
     }
     fclose(file);
 }
 
 // ===== features =====
 void display_all() {
-    if (record_count == 0) {
+    if (note_count == 0) {
         printf("no records found.\n");
         return;
     }
     printf("\n--- all travel records ---\n");
-    for (int i = 0; i < record_count; i++) {
-        printf("%d) bookingid: %d | name: %s | city: %s | duration: %s | date: %02d-%s-%04d\n",
-               i + 1, records[i].bookingid, records[i].name,
-               records[i].city, records[i].duration,
-               records[i].day, months[records[i].month], records[i].year);
+    for (int i = 0; i < note_count; i++) {
+        printf("%d) BookingId: %d | Name: %s | City: %s | Duration: %s days | Date: %02d-%s-%04d\n",
+               i + 1, records[i].BookingId, records[i].Name,
+               records[i].City, records[i].Duration,
+               records[i].Day, months[records[i].Month], records[i].Year);
     }
 }
 
 int search(char *term) {
     int found = 0;
     printf("\n--- search results for \"%s\" ---\n", term);
-    for (int i = 0; i < record_count; i++) {
+    for (int i = 0; i < note_count; i++) {
         char date_str[20];
-        sprintf(date_str, "%02d-%02d-%04d", records[i].day, records[i].month, records[i].year);
+        sprintf(date_str, "%02d-%02d-%04d", records[i].Day, records[i].Month, records[i].Year);
 
-        if (strstr(records[i].name, term) ||
-            strstr(records[i].city, term) ||
-            strstr(records[i].duration, term) ||
+        if (strstr(records[i].Name, term) ||
+            strstr(records[i].City, term) ||
+            strstr(records[i].Duration, term) ||
             strstr(date_str, term)) {
-            printf("%d) bookingid: %d | name: %s | city: %s | duration: %s | date: %02d-%s-%04d\n",
-                   i + 1, records[i].bookingid, records[i].name,
-                   records[i].city, records[i].duration,
-                   records[i].day, months[records[i].month], records[i].year);
+            printf("%d) BookingId: %d | Name: %s | City: %s | Duration: %s days | Date: %02d-%s-%04d\n",
+                   i + 1, records[i].BookingId, records[i].Name,
+                   records[i].City, records[i].Duration,
+                   records[i].Day, months[records[i].Month], records[i].Year);
             found++;
         }
     }
@@ -136,87 +146,62 @@ int search(char *term) {
 }
 
 void add_record() {
-    if (record_count >= max_rec) {
-        printf("cannot add more records\n");
+    if (note_count >= max_note) {
+        printf("can't add more records\n");
         return;
     }
-    record r;
+    note r;
     int cy = current_year();
-    r.bookingid = ++lastbookingid;
-    printf("enter name: "); scanf(" %[^\n]", r.name);
-    printf("enter city: "); scanf(" %[^\n]", r.city);
-    printf("enter duration: "); scanf(" %[^\n]", r.duration);
+    r.BookingId = ++LastBookingId;
+    printf("enter name: "); scanf(" %[^\n]", r.Name);
+    printf("enter city: "); scanf(" %[^\n]", r.City);
 
     do {
-        printf("enter day: "); scanf("%d", &r.day);
-        printf("enter month: "); scanf("%d", &r.month);
-        printf("enter year (BE or AD): "); scanf("%d", &r.year);
-        if (r.year > 2500) r.year -= 543;
-        if (!valid_date(r.day, r.month, r.year))
-            printf("invalid date. try again.\n");
-        else if (r.year < cy - 10 || r.year > cy + 10)
-            printf("year must be within %d to %d. try again.\n", cy - 10, cy + 10);
-        else break;
+        printf("enter duration (days): ");
+        scanf(" %[^\n]", r.Duration);
+        if (!valid_number(r.Duration)) {
+            printf("invalid duration. please enter a number only.\n");
+        } else break;
     } while (1);
 
-    records[record_count++] = r;
-    save_csv();
-    printf("record added successfully (bookingid = %d)\n", r.bookingid);
-}
+    do {
+        printf("enter date: "); scanf("%d", &r.Day);
+        printf("enter month: "); scanf("%d", &r.Month);
+        printf("enter year (can only record for the past 10 years or later): "); scanf("%d", &r.Year);
 
-void edit_record() {
-    char term[100];
-    printf("search record to edit: ");
-    scanf(" %[^\n]", term);
-    int found = search(term);
-    if (!found) {
-        int choice;
-        printf("no record found. do you want to (1)add new or (2)search again? : ");
-        scanf("%d", &choice);
-        if (choice == 1) add_record();
-        else edit_record();
-        return;
-    }
-    int idx;
-    printf("enter index to edit: ");
-    scanf("%d", &idx);
-    idx--;
-    if (idx < 0 || idx >= record_count) return;
+        if (r.Year > 2400) r.Year -= 543;
 
-    int opt;
-    printf("choose field: 1) date 2) name 3) city 4) duration : ");
-    scanf("%d", &opt);
-    switch (opt) {
-        case 1: {
-            int cy = current_year();
-            do {
-                printf("enter new day: "); scanf("%d", &records[idx].day);
-                printf("enter new month: "); scanf("%d", &records[idx].month);
-                printf("enter new year (BE or AD): "); scanf("%d", &records[idx].year);
-                if (records[idx].year > 2500) records[idx].year -= 543;
-                if (!valid_date(records[idx].day, records[idx].month, records[idx].year))
-                    printf("invalid date.\n");
-                else if (records[idx].year < cy - 10 || records[idx].year > cy + 10)
-                    printf("year must be within %d to %d.\n", cy - 10, cy + 10);
-                else break;
-            } while (1);
+        if (!valid_date(r.Day, r.Month, r.Year)) {
+            printf("invalid date. try again.\n");
+        } else if (r.Year < cy - 10 || r.Year > cy + 10) {
+            printf("year must be within %d to %d (AD). try again.\n", cy - 10, cy + 10);
+        } else {
             break;
         }
-        case 2: printf("new name: "); scanf(" %[^\n]", records[idx].name); break;
-        case 3: printf("new city: "); scanf(" %[^\n]", records[idx].city); break;
-        case 4: printf("new duration: "); scanf(" %[^\n]", records[idx].duration); break;
-        default: printf("invalid choice\n"); return;
+    } while (1);
+
+    printf("\n--- please review your entry ---\n");
+    printf("name: %s\ncity: %s\nduration: %s days\ndate: %02d-%s-%04d\n",
+           r.Name, r.City, r.Duration, r.Day, months[r.Month], r.Year);
+    char confirm;
+    printf("save this record? (y/n): ");
+    scanf(" %c", &confirm);
+    if (tolower(confirm) != 'y') {
+        printf("record discarded.\n");
+        return;
     }
+
+    records[note_count++] = r;
     save_csv();
-    printf("record updated successfully\n");
+    printf("record added successfully (Booking Id = %d)\n", r.BookingId);
 }
 
-void save_deleted(record r) {
+void save_deleted(note r) {
     FILE *file = fopen(deleted_file, "a");
     if (!file) return;
     fprintf(file, "%d,%s,%s,%s,%02d-%02d-%04d\n",
-            r.bookingid, r.name, r.city, r.duration,
-            r.day, r.month, r.year);
+            r.BookingId, r.Name, r.City, r.Duration,
+            r.Day, r.Month, r.Year);
     fclose(file);
 }
 
@@ -226,51 +211,57 @@ void delete_record() {
     scanf(" %[^\n]", term);
     int found = search(term);
     if (!found) return;
-    int idx, confirm;
+    int idx;
     printf("enter index to delete: "); scanf("%d", &idx);
     idx--;
-    if (idx < 0 || idx >= record_count) return;
-    printf("confirm delete bookingid %d? (1=yes/0=no): ", records[idx].bookingid);
-    scanf("%d", &confirm);
-    if (confirm) {
+    if (idx < 0 || idx >= note_count) return;
+    char confirm;
+    printf("confirm delete Booking Id %d? (y/n): ", records[idx].BookingId);
+    scanf(" %c", &confirm);
+    if (tolower(confirm) == 'y') {
         save_deleted(records[idx]);
-        for (int i = idx; i < record_count - 1; i++)
+        for (int i = idx; i < note_count - 1; i++)
             records[i] = records[i + 1];
-        record_count--;
+        note_count--;
         save_csv();
         printf("record deleted.\n");
+    } else {
+        printf("delete canceled.\n");
     }
 }
 
 void restore_record() {
     int bid;
-    printf("enter bookingid to restore: "); scanf("%d", &bid);
+    printf("enter Booking Id to restore: "); scanf("%d", &bid);
     FILE *file = fopen(deleted_file, "r");
     if (!file) { printf("no deleted records found.\n"); return; }
-    record r;
+    note r;
     char line[max_line];
     int found = 0;
     while (fgets(line, sizeof(line), file)) {
         if (sscanf(line, "%d,%99[^,],%99[^,],%49[^,],%d-%d-%d",
-                   &r.bookingid, r.name, r.city, r.duration, &r.day, &r.month, &r.year) == 7) {
-            if (r.bookingid == bid) { found = 1; break; }
+                   &r.BookingId, r.Name, r.City, r.Duration, &r.Day, &r.Month, &r.Year) == 7) {
+            if (r.BookingId == bid) { found = 1; break; }
         }
     }
     fclose(file);
     if (!found) { printf("record not found.\n"); return; }
-    printf("restore record %d (%s, %s, %s, %02d-%s-%04d)? (1=yes/0=no): ",
-           r.bookingid, r.name, r.city, r.duration, r.day, months[r.month], r.year);
-    int confirm; scanf("%d", &confirm);
-    if (confirm) {
-        records[record_count++] = r;
+    char confirm;
+    printf("restore record %d (%s, %s, %s days, %02d-%s-%04d)? (y/n): ",
+           r.BookingId, r.Name, r.City, r.Duration, r.Day, months[r.Month], r.Year);
+    scanf(" %c", &confirm);
+    if (tolower(confirm) == 'y') {
+        records[note_count++] = r;
         save_csv();
         printf("record restored.\n");
+    } else {
+        printf("restore canceled.\n");
     }
 }
 
 // ===== main =====
 int main() {
-    backup_csv();
+    create_copy_csv();
     load_csv();
     int choice;
     while (1) {
@@ -278,10 +269,9 @@ int main() {
         printf("1. display all records\n");
         printf("2. search records\n");
         printf("3. add record\n");
-        printf("4. edit record\n");
-        printf("5. delete record\n");
-        printf("6. restore deleted record\n");
-        printf("7. exit\n");
+        printf("4. delete record\n");
+        printf("5. restore deleted record\n");
+        printf("6. exit\n");
         printf("enter choice: ");
         scanf("%d", &choice);
 
@@ -290,24 +280,24 @@ int main() {
             case 2: {
                 char term[100];
                 do {
-                    printf("enter search term (type exit to stop): ");
+                    printf("enter search term (type 'x' to stop): ");
                     scanf(" %[^\n]", term);
-                    if (strcmp(term, "exit") == 0) break;
+                    if (strcmp(term, "x") == 0) break;
                     search(term);
                 } while (1);
                 break;
             }
             case 3: add_record(); break;
-            case 4: edit_record(); break;
-            case 5: delete_record(); break;
-            case 6: restore_record(); break;
-            case 7: {
-                int confirm;
-                printf("are you sure you want to exit? (1=yes / 0=no): ");
-                scanf("%d", &confirm);
-                if (confirm) {
-                    restore_csv();
-                    printf("all changes reverted — goodbye!\n");
+            case 4: delete_record(); break;
+            case 5: restore_record(); break;
+            case 6: {
+                char confirm;
+                printf("are you sure you want to exit? (y/n): ");
+                scanf(" %c", &confirm);
+                if (tolower(confirm) == 'y') {
+                    remove(copy_file);
+                    remove(deleted_file);
+                    printf("thank you for using our traveling record service!\n");
                     return 0;
                 }
                 break;
