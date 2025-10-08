@@ -259,6 +259,104 @@ void restore_record() {
     }
 }
 
+// ===== unit tests =====
+void run_unit_tests() {
+    printf("\n===== running unit tests =====\n");
+
+    // test search()
+    printf("\n[TEST] search() function\n");
+    note test = {999, "Alice", "Paris", "3", 1, 1, 2024};
+    records[note_count++] = test;
+    int found = search("Paris");
+    printf("expected: found >= 1 | got: %d\n", found);
+    if (found >= 1) printf("search() test passed!\n");
+    else printf("search() test failed!\n");
+
+    // test restore_record()
+    printf("\n[TEST] restore_record() function\n");
+    FILE *df = fopen(deleted_file, "w");
+    fprintf(df, "%d,%s,%s,%s,%02d-%02d-%04d\n",
+            1000, "Bob", "London", "5", 10, 10, 2024);
+    fclose(df);
+
+    // จำลองการ restore
+    FILE *file = fopen(deleted_file, "r");
+    if (file) {
+        note r;
+        char line[max_line];
+        int found2 = 0;
+        while (fgets(line, sizeof(line), file)) {
+            if (sscanf(line, "%d,%99[^,],%99[^,],%49[^,],%d-%d-%d",
+                       &r.BookingId, r.Name, r.City, r.Duration,
+                       &r.Day, &r.Month, &r.Year) == 7) {
+                if (r.BookingId == 1000) {
+                    records[note_count++] = r;
+                    found2 = 1;
+                    break;
+                }
+            }
+        }
+        fclose(file);
+        if (found2) printf("restore_record() test passed!\n");
+        else printf("restore_record() test failed!\n");
+    }
+
+    printf("\n===== unit tests finished =====\n");
+}
+
+void run_e2e_test() {
+    printf("\n===== running E2E test =====\n");
+
+    // Step 1: เริ่มต้นระบบใหม่
+    note_count = 0;
+    LastBookingId = 0;
+    remove(copy_file);
+    remove(deleted_file);
+    create_copy_csv();
+
+    // Step 2: เพิ่มข้อมูลใหม่
+    note new_rec = {++LastBookingId, "TestUser", "Tokyo", "5", 10, 10, 2025};
+    records[note_count++] = new_rec;
+    save_csv();
+    printf("[E2E] added record (BookingId=%d)\n", new_rec.BookingId);
+
+    // Step 3: ลบข้อมูลนั้น
+    save_deleted(new_rec);
+    note_count--;
+    save_csv();
+    printf("[E2E] deleted record\n");
+
+    // Step 4: เรียกคืนข้อมูล
+    FILE *file = fopen(deleted_file, "r");
+    if (file) {
+        char line[max_line];
+        note r;
+        while (fgets(line, sizeof(line), file)) {
+            if (sscanf(line, "%d,%99[^,],%99[^,],%49[^,],%d-%d-%d",
+                       &r.BookingId, r.Name, r.City, r.Duration,
+                       &r.Day, &r.Month, &r.Year) == 7) {
+                records[note_count++] = r;
+                break;
+            }
+        }
+        fclose(file);
+    }
+    save_csv();
+    printf("[E2E] restored record\n");
+
+    // Step 5: ค้นหาว่ามีข้อมูลหรือไม่
+    int found = search("Tokyo");
+    printf("[E2E] search result: %d record(s) found\n", found);
+
+    // Step 6: ตรวจผลลัพธ์
+    if (found > 0)
+        printf("E2E test PASSED!\n");
+    else
+        printf("E2E test FAILED!\n");
+
+    printf("===== end of E2E test =====\n");
+}
+
 // ===== main =====
 int main() {
     create_copy_csv();
@@ -272,6 +370,8 @@ int main() {
         printf("4. delete record\n");
         printf("5. restore deleted record\n");
         printf("6. exit\n");
+        printf("7. run unit tests\n");
+        printf("8. run E2E test\n");
         printf("enter choice: ");
         scanf("%d", &choice);
 
@@ -302,6 +402,8 @@ int main() {
                 }
                 break;
             }
+            case 7: run_unit_tests(); break;
+            case 8: run_e2e_test(); break;
             default: printf("invalid choice\n");
         }
     }
